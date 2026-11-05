@@ -1,0 +1,201 @@
+package rules
+
+import com.ikea.spring.drools.api.model.OrderMessage
+import org.slf4j.Logger
+
+global Logger logger;
+
+
+rule "Mandatory field validation"
+dialect "java"
+when
+    $order : OrderMessage()
+then
+    logger.info(
+        "[DROOLS] Mandatory field validation started. orderId={}",
+        $order.getOrderId()
+    );
+
+    if ($order.getOrderId() == null || $order.getOrderId().trim().isEmpty()) {
+        logger.warn("[DROOLS] Validation failed: orderId is mandatory");
+        $order.reject("orderId is mandatory");
+    }
+
+    if ($order.getCustomerName() == null || $order.getCustomerName().trim().isEmpty()) {
+        logger.warn(
+            "[DROOLS] Validation failed: customerName is mandatory. orderId={}",
+            $order.getOrderId()
+        );
+        $order.reject("customerName is mandatory");
+    }
+
+    if ($order.getCountry() == null || $order.getCountry().trim().isEmpty()) {
+        logger.warn(
+            "[DROOLS] Validation failed: country is mandatory. orderId={}",
+            $order.getOrderId()
+        );
+        $order.reject("country is mandatory");
+    }
+
+    if ($order.getOrderType() == null || $order.getOrderType().trim().isEmpty()) {
+        logger.warn(
+            "[DROOLS] Validation failed: orderType is mandatory. orderId={}",
+            $order.getOrderId()
+        );
+        $order.reject("orderType is mandatory");
+    }
+
+    if ($order.getAmount() == null) {
+        logger.warn(
+            "[DROOLS] Validation failed: amount is mandatory. orderId={}",
+            $order.getOrderId()
+        );
+        $order.reject("amount is mandatory");
+    }
+
+    logger.info(
+        "[DROOLS] Mandatory field validation completed. orderId={}",
+        $order.getOrderId()
+    );
+end
+
+
+rule "Country-based validation"
+dialect "java"
+when
+    $order : OrderMessage(
+        country != null && country.trim().length() > 0
+    )
+then
+    String country = $order.getCountry().trim().toUpperCase();
+
+    logger.info(
+        "[DROOLS] Country validation started. orderId={}, country={}",
+        $order.getOrderId(),
+        country
+    );
+
+    if (!"US".equals(country)
+            && !"IN".equals(country)
+            && !"GB".equals(country)
+            && !"DE".equals(country)
+            && !"SG".equals(country)) {
+
+        logger.warn(
+            "[DROOLS] Country validation failed. orderId={}, unsupportedCountry={}",
+            $order.getOrderId(),
+            country
+        );
+
+        $order.reject(
+            "country '" + $order.getCountry()
+            + "' is not supported. Allowed values: US, IN, GB, DE, SG"
+        );
+
+    } else {
+
+        logger.info(
+            "[DROOLS] Country validation passed. orderId={}, country={}",
+            $order.getOrderId(),
+            country
+        );
+    }
+end
+
+
+rule "Order amount and type validation"
+dialect "java"
+when
+    $order : OrderMessage()
+then
+    String orderType = $order.getOrderType();
+    Double amount = $order.getAmount();
+
+    logger.info(
+        "[DROOLS] Amount/type validation started. orderId={}, orderType={}, amount={}",
+        $order.getOrderId(),
+        orderType,
+        amount
+    );
+
+    if (orderType != null && !orderType.trim().isEmpty()) {
+
+        String type = orderType.trim().toUpperCase();
+
+        if (!"STANDARD".equals(type)
+                && !"EXPRESS".equals(type)
+                && !"BULK".equals(type)) {
+
+            logger.warn(
+                "[DROOLS] Unsupported order type. orderId={}, orderType={}",
+                $order.getOrderId(),
+                orderType
+            );
+
+            $order.reject(
+                "orderType '" + orderType
+                + "' is not supported. Allowed values: STANDARD, EXPRESS, BULK"
+            );
+
+        } else if (amount != null && amount > 0) {
+
+            if ("STANDARD".equals(type) && amount > 10000) {
+
+                logger.warn(
+                    "[DROOLS] STANDARD amount limit exceeded. orderId={}, amount={}, limit={}",
+                    $order.getOrderId(),
+                    amount,
+                    10000
+                );
+
+                $order.reject(
+                    "STANDARD orders cannot exceed amount 10000"
+                );
+            }
+
+            if ("EXPRESS".equals(type) && amount > 50000) {
+
+                logger.warn(
+                    "[DROOLS] EXPRESS amount limit exceeded. orderId={}, amount={}, limit={}",
+                    $order.getOrderId(),
+                    amount,
+                    50000
+                );
+
+                $order.reject(
+                    "EXPRESS orders cannot exceed amount 50000"
+                );
+            }
+
+            if ("BULK".equals(type) && amount > 100000) {
+
+                logger.warn(
+                    "[DROOLS] BULK amount limit exceeded. orderId={}, amount={}, limit={}",
+                    $order.getOrderId(),
+                    amount,
+                    100000
+                );
+
+                $order.reject(
+                    "BULK orders cannot exceed amount 100000"
+                );
+            }
+        }
+    }
+
+    if (amount != null && amount <= 0) {
+
+        logger.warn(
+            "[DROOLS] Invalid amount. orderId={}, amount={}. Amount must be greater than zero.",
+            $order.getOrderId(),
+            amount
+        );
+
+        $order.reject("amount must be greater than 0");
+    }
+
+    logger.info(
+        "[DROOLS] Amount/type validation completed. orderId={}",
+        $order.getOrderId()
+    );
+end
